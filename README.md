@@ -22,5 +22,12 @@ Version estatica para GitHub Pages basada en el proyecto Android, el reglamento 
 - Click sobre cualquier Power Card para ampliarla.
 - Desde la ampliacion se puede activar la carta.
 - Las ventanas emergentes muestran objetivos, dados, costos, declaraciones y cartas seleccionables segun el efecto.
-- El boton de herramientas abre dados, monedas, tabla de cobros y revisiones de deck.
+- El boton de herramientas abre configuracion de mesa, catalogo, constructor de deck, dados, monedas, tabla de cobros y revisiones de deck.
 - El selector `Manual / Semi auto` aplica una animacion de transicion y cambia si la app solo guia o si resuelve cambios de estado.
+
+## Actualizacion visual y reglas
+
+- Layout de escritorio recalculado para que la mano inferior no tape asientos, mesa ni registro.
+- CounterCards elegibles se muestran por jugador y se activan de forma explicita.
+- Efectos con dados permiten aplicar `Manipulador del Destino` cuando corresponde.
+- El cobro semi automatico revisa pareja, trio, poker, color y escalera, consume las cartas cobradas y repone la mano.
