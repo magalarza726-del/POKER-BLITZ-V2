@@ -11,6 +11,7 @@ const avatars = ["👑", "🗡", "☽", "✦", "♜", "⚔"];
 const state = {
   mode: "auto",
   activePlayer: 0,
+  playerCount: 6,
   phase: "Main Phase",
   handSection: "power",
   goal: 30,
@@ -85,11 +86,20 @@ function newPlayer(index, name) {
   };
 }
 
-function initGame() {
+function initGame(playerCount = state.playerCount || 6) {
+  state.playerCount = Math.max(2, Math.min(6, playerCount));
+  state.activePlayer = 0;
+  state.phase = "Main Phase";
+  state.handSection = "power";
+  state.lastSuperCardId = null;
+  state.log = [];
   state.pokerDeck = buildPokerDeck();
-  state.players = ["Tú", "Sombra", "Drako77", "LunaSolar", "Nébula", "Kaiser"].map((name, i) => newPlayer(i, name));
+  state.pokerDiscard = [];
+  state.players = ["Tú", "Sombra", "Drako77", "LunaSolar", "Nébula", "Kaiser"]
+    .slice(0, state.playerCount)
+    .map((name, i) => newPlayer(i, name));
   state.players.forEach((_, index) => drawPoker(index, index === 0 ? 7 : 5));
-  pushLog("Mesa lista: 6 asientos, HyperCards visibles y efectos por ventana.");
+  pushLog(`Mesa lista: ${state.playerCount} asientos, HyperCards visibles y efectos por ventana.`);
   render();
 }
 
@@ -332,6 +342,7 @@ function specFor(cardId) {
 }
 
 function openCounterWindow(cardId) {
+  const originalCard = cardById.get(cardId);
   const rivals = state.players
     .map((player, index) => ({ player, index }))
     .filter(({ index }) => index !== state.activePlayer)
@@ -356,19 +367,49 @@ function openCounterWindow(cardId) {
     <div class="modal-body effect-grid">
       <section class="effect-section">
         <h3>Respuestas en mesa</h3>
+        <p class="small-note">Elige exactamente qué CounterCard responderá a ${originalCard?.name || "la activación"}. Las Power Cards siempre pueden ampliarse antes de decidir.</p>
         <div class="card-choice-row">
           ${rivals.map(({ id, player, index }) => `<div>
             ${renderPowerCard(id, { owner: index })}
             <p class="small-note">${player.name}</p>
+            <button class="modal-button blue" data-counter-use="${id}" data-counter-owner="${index}" data-counter-source="${cardId}">Activar ${cardById.get(id)?.name}</button>
           </div>`).join("")}
         </div>
       </section>
       <div class="modal-actions">
         <button class="modal-button danger" data-counter-skip="${cardId}">No activar Counter</button>
-        <button class="modal-button primary" data-counter-auto="${cardId}">Activar primera Counter</button>
       </div>
     </div>`;
   els.effectDialog.showModal();
+}
+
+function activateCounter(counterId, ownerIndex, originalId) {
+  const counter = cardById.get(counterId);
+  const original = cardById.get(originalId);
+  removePowerFromHand(ownerIndex, [counterId]);
+  closeDialogs();
+  if (counterId === "catalog_v3_033") {
+    pushLog(`${counter?.name}: niega ${original?.name}.`);
+    render();
+    return;
+  }
+  if (counterId === "catalog_v3_004" && !superIds.has(originalId)) {
+    pushLog(`${counter?.name}: no aplica porque ${original?.name} no es SuperCard.`);
+    openEffectWindow(originalId);
+    return;
+  }
+  if (counterId === "catalog_v3_048") {
+    const target = activePlayer();
+    if (target.chips > 0) {
+      target.chips -= 1;
+      state.players[ownerIndex].chips += 1;
+      pushLog(`${counter?.name}: ${state.players[ownerIndex].name} roba 1 ficha antes de ${original?.name}.`);
+    }
+    openEffectWindow(originalId);
+    return;
+  }
+  pushLog(`${counter?.name}: respuesta activada por ${state.players[ownerIndex].name}; continúa ${original?.name}.`);
+  openEffectWindow(originalId);
 }
 
 function openEffectWindow(cardId) {
@@ -377,6 +418,7 @@ function openEffectWindow(cardId) {
   const selected = {
     target: state.players.findIndex((_, index) => index !== state.activePlayer),
     dice: [],
+    diceMod: 0,
     suit: null,
     value: null,
     action: spec.actionChoices[0]?.[0] || null,
@@ -411,7 +453,7 @@ function openEffectWindow(cardId) {
         ${needsCost ? costSection(active, cost, selected, cardId) : ""}
         ${spec.target ? targetSection(selected) : ""}
         ${spec.actionChoices.length ? choiceSection("Elige efecto", spec.actionChoices, selected.action, "action") : ""}
-        ${spec.dice ? diceSection(spec.dice, selected.dice) : ""}
+        ${spec.dice ? diceSection(spec.dice, selected.dice, selected.diceMod) : ""}
         ${spec.declarationSuit ? suitSection(selected.suit) : ""}
         ${spec.declarationValue ? valueSection(selected.value) : ""}
         ${spec.ownPoker ? ownPokerSection(active, selected) : ""}
@@ -468,11 +510,13 @@ function choiceSection(title, choices, current, key) {
   </section>`;
 }
 
-function diceSection(count, dice) {
+function diceSection(count, dice, diceMod = 0) {
   const diceHtml = Array.from({ length: count }, (_, i) => `<div class="die">${dice[i] || "?"}</div>`).join("");
+  const canModify = activePlayer().flags.diceModifier && dice.length;
   return `<section class="effect-section">
     <h3>Dados</h3>
     <div class="dice-box">${diceHtml}<button class="modal-button blue" data-roll-dice="${count}">Lanzar</button></div>
+    ${canModify ? `<div class="choice-row"><button class="pill-choice ${diceMod === -1 ? "selected" : ""}" data-dice-mod="-1">Usar Manipulador -1</button><button class="pill-choice ${diceMod === 1 ? "selected" : ""}" data-dice-mod="1">Usar Manipulador +1</button><button class="pill-choice ${diceMod === 0 ? "selected" : ""}" data-dice-mod="0">No modificar</button></div>` : ""}
   </section>`;
 }
 
@@ -554,8 +598,15 @@ function bindEffectControls(selected, rerender) {
     button.addEventListener("click", () => {
       const count = Number(button.dataset.rollDice);
       selected.dice = Array.from({ length: count }, () => 1 + Math.floor(Math.random() * 6));
+      if (!activePlayer().flags.diceModifier) selected.diceMod = 0;
       els.effectDialog.classList.add("spark");
       setTimeout(() => els.effectDialog.classList.remove("spark"), 700);
+      rerender();
+    });
+  });
+  els.effectDialog.querySelectorAll("[data-dice-mod]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selected.diceMod = Number(button.dataset.diceMod);
       rerender();
     });
   });
@@ -608,7 +659,13 @@ function confirmEffect(cardId, selected) {
 function resolveEffect(cardId, selected) {
   const player = activePlayer();
   const target = state.players[selected.target];
-  const diceTotal = selected.dice.reduce((sum, value) => sum + value, 0);
+  const diceTotalRaw = selected.dice.reduce((sum, value) => sum + value, 0);
+  const diceMod = player.flags.diceModifier ? Number(selected.diceMod || 0) : 0;
+  const diceTotal = diceTotalRaw + diceMod;
+  if (diceMod) {
+    player.flags.diceModifier = false;
+    pushLog(`Manipulador del Destino aplica ${diceMod > 0 ? "+" : ""}${diceMod}: ${diceTotalRaw} -> ${diceTotal}.`);
+  }
   const chosenOwn = player.pokerHand.filter((card) => selected.ownPoker.has(card.id));
   const chosenTarget = target?.pokerHand.filter((card) => selected.targetPoker.has(card.id)) || [];
   const draw = (n) => drawPoker(state.activePlayer, n);
@@ -670,7 +727,7 @@ function resolveEffect(cardId, selected) {
     case "catalog_v3_053": return `robas ${draw(1)} Poker Card.`;
     case "catalog_v3_054": return `robas ${drawPower(state.activePlayer, 1)} Power Card.`;
     case "catalog_v3_055": return `${stealChip(selected)} Pagas ${movePoker(state.activePlayer, selected.target, [...selected.ownPoker].slice(0, 2)).length} Poker Cards.`;
-    case "catalog_v3_056": target.pokerLimit = 5; return `${target.name} queda limitado a 5 y descarta ${removePoker(selected.target, chosenTarget.map((c) => c.id)).length || Math.max(0, target.pokerHand.length - 5)} excedentes.`;
+    case "catalog_v3_056": return falsoLimitador(selected, chosenTarget);
     default: return "efecto registrado.";
   }
 }
@@ -847,6 +904,20 @@ function stealChip(selected) {
   return `robas 1 ficha a ${target.name}.`;
 }
 
+function falsoLimitador(selected, chosenTarget) {
+  const target = state.players[selected.target];
+  if (!target) return "sin objetivo valido.";
+  target.pokerLimit = 5;
+  const excess = Math.max(0, target.pokerHand.length - target.pokerLimit);
+  const selectedIds = chosenTarget.map((card) => card.id).slice(0, excess || chosenTarget.length);
+  const fallbackIds = target.pokerHand
+    .filter((card) => !selectedIds.includes(card.id))
+    .slice(0, Math.max(0, excess - selectedIds.length))
+    .map((card) => card.id);
+  const removed = removePoker(selected.target, [...selectedIds, ...fallbackIds]);
+  return `${target.name} queda limitado a 5 y descarta ${removed.length} excedente(s).`;
+}
+
 function blackjackValue(card) {
   if (card.joker) return 11;
   if (card.value > 10) return 10;
@@ -875,26 +946,78 @@ function openInfo(title, content) {
 
 function scoreBestHand() {
   const player = activePlayer();
-  const groups = player.pokerHand.reduce((acc, card) => {
+  const used = [];
+  const usedIds = new Set();
+  let chips = 0;
+  const details = [];
+  const mark = (cardsToUse) => {
+    cardsToUse.forEach((card) => {
+      used.push(card);
+      usedIds.add(card.id);
+    });
+  };
+  const remaining = () => player.pokerHand.filter((card) => !usedIds.has(card.id));
+  const groups = () => remaining().reduce((acc, card) => {
     const key = String(card.value);
     if (!acc.has(key)) acc.set(key, []);
     acc.get(key).push(card);
     return acc;
   }, new Map());
-  let chips = 0;
-  const used = [];
-  groups.forEach((group) => {
-    if (group.length >= 4) { chips += 5; used.push(...group.slice(0, 4)); }
-    else if (group.length >= 3) { chips += 3; used.push(...group.slice(0, 3)); }
-    else if (group.length >= 2) { chips += 1; used.push(...group.slice(0, 2)); }
+
+  [...groups().values()].sort((a, b) => b.length - a.length).forEach((group) => {
+    if (group.length >= 4) {
+      chips += 5;
+      details.push("Poker +5");
+      mark(group.slice(0, 4));
+    }
   });
-  const flushSuit = suits.find((suit) => player.pokerHand.filter((card) => card.suit === suit).length >= 5);
-  if (flushSuit) chips += 4;
+  [...groups().values()].sort((a, b) => b.length - a.length).forEach((group) => {
+    if (group.length >= 3) {
+      chips += 3;
+      details.push("Trio +3");
+      mark(group.slice(0, 3));
+    }
+  });
+  [...groups().values()].sort((a, b) => b.length - a.length).forEach((group) => {
+    if (group.length >= 2) {
+      chips += 1;
+      details.push("Pareja +1");
+      mark(group.slice(0, 2));
+    }
+  });
+
+  const flushSuit = suits.find((suit) => remaining().filter((card) => card.suit === suit).length >= 5);
+  if (flushSuit) {
+    const flushCards = remaining().filter((card) => card.suit === flushSuit).slice(0, 5);
+    chips += 4;
+    details.push("Color +4");
+    mark(flushCards);
+  }
+
+  const uniqueByValue = new Map();
+  remaining()
+    .filter((card) => !card.joker)
+    .sort((a, b) => a.value - b.value)
+    .forEach((card) => {
+      if (!uniqueByValue.has(card.value)) uniqueByValue.set(card.value, card);
+    });
+  const ordered = [...uniqueByValue.keys()];
+  for (let i = 0; i <= ordered.length - 5; i += 1) {
+    const run = ordered.slice(i, i + 5);
+    if (run.every((value, offset) => value === run[0] + offset)) {
+      const straight = run.map((value) => uniqueByValue.get(value));
+      chips += 7;
+      details.push("Escalera +7");
+      mark(straight);
+      break;
+    }
+  }
+
   if (!chips) return "sin combinaciones automáticas para cobrar.";
   player.chips += chips;
   removePoker(state.activePlayer, used.map((card) => card.id));
   drawPoker(state.activePlayer, used.length);
-  return `cobro semi automatico: +${chips} fichas.`;
+  return `cobro semi automatico: ${details.join(", ")} = +${chips} fichas.`;
 }
 
 function nextTurn() {
@@ -929,6 +1052,38 @@ document.addEventListener("click", (event) => {
   const confirm = event.target.closest("[data-confirm-effect]");
   if (confirm) {
     confirmEffect(confirm.dataset.confirmEffect, window.__lastSelection || {});
+    return;
+  }
+  const addPowerHand = event.target.closest("[data-add-power-hand]");
+  if (addPowerHand) {
+    addPowerToPlayer(state.activePlayer, addPowerHand.dataset.addPowerHand, "hand");
+    return;
+  }
+  const addPowerDeck = event.target.closest("[data-add-power-deck]");
+  if (addPowerDeck) {
+    addPowerToPlayer(state.activePlayer, addPowerDeck.dataset.addPowerDeck, "deck");
+    return;
+  }
+  const setupPlayers = event.target.closest("[data-setup-players]");
+  if (setupPlayers) {
+    initGame(Number(setupPlayers.dataset.setupPlayers));
+    closeDialogs();
+    return;
+  }
+  const drawPokerTool = event.target.closest("[data-draw-poker]");
+  if (drawPokerTool) {
+    const count = drawPoker(state.activePlayer, Number(drawPokerTool.dataset.drawPoker));
+    pushLog(`${activePlayer().name} roba ${count} Poker Card(s) desde configuración.`);
+    closeDialogs();
+    render();
+    return;
+  }
+  const drawPowerTool = event.target.closest("[data-draw-power]");
+  if (drawPowerTool) {
+    const count = drawPower(state.activePlayer, Number(drawPowerTool.dataset.drawPower));
+    pushLog(`${activePlayer().name} roba ${count} Power Card(s) desde configuración.`);
+    closeDialogs();
+    render();
   }
 });
 
@@ -940,12 +1095,9 @@ els.effectDialog.addEventListener("click", (event) => {
     openEffectWindow(id);
     return;
   }
-  const auto = event.target.closest("[data-counter-auto]");
-  if (auto) {
-    pushLog("CounterCard activada antes de resolver la cadena.");
-    const id = auto.dataset.counterAuto;
-    closeDialogs();
-    openEffectWindow(id);
+  const counterUse = event.target.closest("[data-counter-use]");
+  if (counterUse) {
+    activateCounter(counterUse.dataset.counterUse, Number(counterUse.dataset.counterOwner), counterUse.dataset.counterSource);
   }
 });
 
@@ -978,6 +1130,14 @@ els.toolsPanel.addEventListener("click", (event) => {
   const button = event.target.closest("[data-tool]");
   if (!button) return;
   const tool = button.dataset.tool;
+  els.toolsPanel.classList.add("hidden");
+  if (tool === "newGame") {
+    initGame(state.playerCount);
+    return;
+  }
+  if (tool === "setup") openSetup();
+  if (tool === "catalog") openCatalog();
+  if (tool === "deckBuilder") openDeckBuilder();
   if (tool === "die1") openInfo("1 dado", `<div class="dice-box"><div class="die">${1 + Math.floor(Math.random() * 6)}</div></div>`);
   if (tool === "die2") openInfo("2 dados", `<div class="dice-box"><div class="die">${1 + Math.floor(Math.random() * 6)}</div><div class="die">${1 + Math.floor(Math.random() * 6)}</div></div>`);
   if (tool === "coin1") openInfo("1 moneda", `<p class="effect-text">${Math.random() > 0.5 ? "Cara" : "Cruz"}</p>`);
@@ -991,6 +1151,67 @@ window.showDeck = (index) => openInfo(`Deck de ${state.players[index].name}`, de
 
 function deckList(player) {
   return `<div class="card-choice-row">${player.powerDeck.slice(0, 18).map((id) => renderPowerCard(id, { owner: state.players.indexOf(player) })).join("")}</div><p class="small-note">${player.powerDeck.length} cartas en deck.</p>`;
+}
+
+function openSetup() {
+  openInfo("Configurar mesa", `
+    <section class="effect-section">
+      <h3>Jugadores</h3>
+      <div class="choice-row">
+        ${[2, 3, 4, 5, 6].map((count) => `<button class="pill-choice ${state.playerCount === count ? "selected" : ""}" data-setup-players="${count}">${count} jugadores</button>`).join("")}
+      </div>
+    </section>
+    <section class="effect-section">
+      <h3>Robo manual del jugador activo</h3>
+      <div class="choice-row">
+        <button class="modal-button blue" data-draw-poker="1">Robar 1 Poker</button>
+        <button class="modal-button blue" data-draw-poker="2">Robar 2 Poker</button>
+        <button class="modal-button primary" data-draw-power="1">Robar 1 Power</button>
+      </div>
+    </section>`);
+}
+
+function openCatalog() {
+  const groups = ["Hyper", "Super", "Counter"].map((type) => {
+    const groupCards = cards.filter((card) => card.type === type);
+    return `<section class="effect-section">
+      <h3>${type} Cards (${groupCards.length})</h3>
+      <div class="card-choice-row">
+        ${groupCards.map((card) => `<div class="catalog-card">${renderPowerCard(card.id, { owner: state.activePlayer })}<p class="small-note">${card.item}. ${card.name}</p></div>`).join("")}
+      </div>
+    </section>`;
+  }).join("");
+  openInfo("Catálogo de cartas", groups);
+}
+
+function openDeckBuilder() {
+  const player = activePlayer();
+  const content = `<section class="effect-section">
+      <h3>${player.name}</h3>
+      <p class="small-note">${player.powerHand.length} en mano · ${player.powerDeck.length} en deck · ${player.activeHyper.length} Hyper activas</p>
+    </section>
+    <section class="effect-section">
+      <h3>Agregar Power Cards</h3>
+      <div class="card-choice-row">
+        ${cards.map((card) => `<div class="catalog-card">
+          ${renderPowerCard(card.id, { owner: state.activePlayer })}
+          <p class="small-note">${card.name}</p>
+          <button class="modal-button blue" data-add-power-hand="${card.id}">A mano</button>
+          <button class="modal-button" data-add-power-deck="${card.id}">A deck</button>
+        </div>`).join("")}
+      </div>
+    </section>`;
+  openInfo("Constructor de Deck", content);
+}
+
+function addPowerToPlayer(playerIndex, cardId, zone) {
+  const player = state.players[playerIndex];
+  if (!player || !cardById.has(cardId)) return;
+  if (zone === "deck") player.powerDeck.push(cardId);
+  else player.powerHand.push(cardId);
+  pushLog(`${cardById.get(cardId)?.name} agregado a ${zone === "deck" ? "deck" : "mano"} de ${player.name}.`);
+  closeDialogs();
+  render();
 }
 
 document.getElementById("endMainBtn").addEventListener("click", () => {
