@@ -342,6 +342,8 @@ function specFor(cardId) {
 }
 
 function openCounterWindow(cardId) {
+  if (els.cardDialog.open) els.cardDialog.close();
+  els.cardDialog.innerHTML = "";
   const originalCard = cardById.get(cardId);
   const rivals = state.players
     .map((player, index) => ({ player, index }))
@@ -413,6 +415,8 @@ function activateCounter(counterId, ownerIndex, originalId) {
 }
 
 function openEffectWindow(cardId) {
+  if (els.cardDialog.open) els.cardDialog.close();
+  els.cardDialog.innerHTML = "";
   const card = cardById.get(cardId);
   const spec = specFor(cardId);
   const selected = {
