@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Poker Blitz V2</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main id="app" class="app-shell">
+      <section class="game-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">PB</div>
+          <div>
+            <h1>Poker Blitz</h1>
+            <span>V2 Web · GitHub Pages</span>
+          </div>
+        </div>
+        <div class="mode-switch" aria-label="Version de juego">
+          <button id="manualModeBtn" class="mode-button">Manual</button>
+          <button id="autoModeBtn" class="mode-button active">Semi auto</button>
+        </div>
+        <div class="status-pills">
+          <span id="turnPill">Turno: Tú</span>
+          <span id="phasePill">Main Phase</span>
+          <span id="goalPill">Meta 30</span>
+        </div>
+      </section>
+
+      <button id="toolsButton" class="tools-button" title="Herramientas">⚒</button>
+      <aside id="toolsPanel" class="tools-panel hidden" aria-label="Herramientas">
+        <button data-tool="die1">Lanzar 1 dado</button>
+        <button data-tool="die2">Lanzar 2 dados</button>
+        <button data-tool="coin1">Lanzar 1 moneda</button>
+        <button data-tool="coin2">Lanzar 2 monedas</button>
+        <button data-tool="payouts">Tabla de cobros</button>
+        <button data-tool="myDeck">Revisar mi Deck</button>
+        <button data-tool="targetDeck">Revisar Deck jugador</button>
+      </aside>
+
+      <section class="battlefield" aria-label="Mesa de juego">
+        <div class="table-aura"></div>
+        <div class="table-ring">
+          <div class="table-label center-zone">Zona central</div>
+          <div class="table-slots">
+            <div></div><div></div><div></div><div></div><div></div>
+          </div>
+          <div class="table-label play-zone">Cartas en juego</div>
+          <div class="deck-row">
+            <button id="pokerDeckButton" class="deck-stack poker-back" title="Poker Deck"></button>
+            <button id="powerDeckButton" class="deck-stack power-back" title="Power Deck"></button>
+            <button id="discardButton" class="deck-stack discard-stack" title="Descartes">✦</button>
+          </div>
+        </div>
+        <div id="seatsLayer" class="seats-layer"></div>
+      </section>
+
+      <section class="hand-dock" aria-label="Mano del jugador">
+        <div class="hand-tabs">
+          <button class="hand-tab active" data-section="hyper">⌀ Hyper Zone</button>
+          <button class="hand-tab" data-section="poker">♠ Poker Hand</button>
+          <button class="hand-tab" data-section="power">✦ Power Hand</button>
+        </div>
+        <div class="hand-carousel">
+          <button id="handPrev" class="arrow-button">‹</button>
+          <div id="handCards" class="hand-cards"></div>
+          <button id="handNext" class="arrow-button">›</button>
+        </div>
+        <div class="phase-controls">
+          <div class="phase-track">
+            <span class="phase-dot active"></span>
+            <span class="phase-line"></span>
+            <span class="phase-dot"></span>
+            <span class="phase-line"></span>
+            <span class="phase-dot"></span>
+          </div>
+          <button id="endMainBtn" class="primary-action blue">Terminar Main Phase</button>
+          <button id="endChargeBtn" class="primary-action gold">Terminar Charge Phase</button>
+        </div>
+      </section>
+
+      <section class="event-log" aria-live="polite">
+        <h2>Registro</h2>
+        <div id="logList"></div>
+      </section>
+    </main>
+
+    <div id="overlay" class="overlay hidden"></div>
+    <dialog id="cardDialog" class="modal card-modal"></dialog>
+    <dialog id="effectDialog" class="modal effect-modal"></dialog>
+    <dialog id="infoDialog" class="modal info-modal"></dialog>
+    <div id="transitionCurtain" class="transition-curtain hidden">
+      <div class="transition-ring"></div>
+      <strong>Cambiando versión</strong>
+    </div>
+
+    <script src="data/cards.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
