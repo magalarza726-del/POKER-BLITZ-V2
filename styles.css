@@ -450,7 +450,7 @@ h1 {
 
 .hand-carousel {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 10px;
   max-width: 980px;
@@ -462,28 +462,28 @@ h1 {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 92px;
+  min-height: 78px;
   overflow-x: auto;
   padding: 6px 4px 8px;
   scrollbar-width: thin;
 }
 
 .arrow-button {
-  height: 72px;
+  height: 64px;
   border: 1px solid rgba(185, 230, 250, 0.4);
   border-radius: 14px;
   background: rgba(6, 24, 40, 0.92);
   cursor: pointer;
-  font-size: 44px;
+  font-size: 38px;
 }
 
 .phase-controls {
   display: grid;
   grid-template-columns: 1fr auto auto 1fr;
   align-items: center;
-  gap: 14px;
+  gap: 8px 14px;
   max-width: 840px;
-  margin: 0 auto 8px;
+  margin: 0 auto 4px;
 }
 
 .phase-track {
@@ -495,16 +495,16 @@ h1 {
 }
 
 .phase-dot {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border: 2px solid rgba(170, 220, 245, 0.85);
   border-radius: 50%;
   background: #081a2c;
 }
 
 .phase-dot.active {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-color: var(--gold-bright);
   box-shadow: 0 0 26px rgba(255, 218, 111, 0.82);
 }
@@ -517,11 +517,11 @@ h1 {
 
 .primary-action {
   min-width: 250px;
-  padding: 12px 20px;
+  padding: 9px 18px;
   border-radius: 10px;
   cursor: pointer;
   font-family: var(--serif);
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 900;
 }
 
@@ -542,7 +542,7 @@ h1 {
 .poker-card,
 .card-back {
   flex: 0 0 auto;
-  width: 72px;
+  width: 64px;
   aspect-ratio: 0.72;
   border-radius: 8px;
   cursor: pointer;
