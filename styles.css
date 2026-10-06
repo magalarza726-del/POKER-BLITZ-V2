@@ -16,7 +16,7 @@
   --shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
   --serif: Georgia, "Times New Roman", serif;
   --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --dock-height: 244px;
+  --dock-height: 286px;
 }
 
 * {
@@ -484,7 +484,7 @@ h1 {
   gap: 8px 14px;
   max-width: 840px;
   margin: 0 auto 4px;
-  transform: translateY(-46px);
+  transform: none;
 }
 
 .phase-track {
